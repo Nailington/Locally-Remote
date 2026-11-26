@@ -3,7 +3,7 @@ class LocallyRemote < Formula
   homepage "https://github.com/Nailington/Locally-Remote"
   url "https://github.com/Nailington/Locally-Remote/releases/download/v0.1.0/locally-remote-0.1.0-macos-universal.tar.gz"
   version "0.1.0"
-  sha256 "PENDING_RELEASE_CI"
+  sha256 "c2c48aea7974583c27853163e1de7edf73a9cc1aec7c10fb170509e79a7cfd2a"
   license "MIT"
 
   depends_on :macos

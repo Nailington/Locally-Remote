@@ -33,18 +33,63 @@ public struct DeviceCtlClient: Sendable {
         return try Self.parseListDevicesJSON(data)
     }
 
-    /// Asks CoreDevice to connect to a device and returns the command result.
-    public func probeDevice(identifier: String, timeoutSeconds: Int = 15) throws -> (ok: Bool, locked: Bool, output: String) {
+    public struct DeviceProbeResult: Sendable {
+        public let ready: Bool
+        public let locked: Bool
+        public let tunnelState: String
+        public let ddiServicesAvailable: Bool
+        public let output: String
+    }
+
+    /// Asks CoreDevice to connect to a device and inspects structured tunnelState instead of exit code alone.
+    public func probeDevice(identifier: String, timeoutSeconds: Int = 15) throws -> DeviceProbeResult {
+        let tmpPath = "/tmp/locally-remote-probe-\(UUID().uuidString).json"
+        defer { try? FileManager.default.removeItem(atPath: tmpPath) }
+
         let result = try NetworkHelpers.runProcess(
             executable: "/usr/bin/xcrun",
-            arguments: ["devicectl", "device", "info", "details", "--device", identifier, "--timeout", "\(timeoutSeconds)"],
+            arguments: [
+                "devicectl", "device", "info", "details",
+                "--device", identifier,
+                "--timeout", "\(timeoutSeconds)",
+                "--json-output", tmpPath
+            ],
             timeout: TimeInterval(timeoutSeconds + 10)
         )
         let combined = [result.stdout, result.stderr].filter { !$0.isEmpty }.joined(separator: "\n")
         let locked = combined.localizedCaseInsensitiveContains("still locked") ||
                      combined.localizedCaseInsensitiveContains("not been unlocked")
-        let ok = result.exitCode == 0 && !locked && !combined.contains("ERROR:")
-        return (ok, locked, combined)
+        let incomplete = combined.localizedCaseInsensitiveContains("Unable to retrieve complete information")
+
+        var tunnelState = "unknown"
+        var ddiAvailable = false
+        if let data = try? Data(contentsOf: URL(fileURLWithPath: tmpPath)),
+           let parsed = Self.parseDeviceDetailsJSON(data) {
+            tunnelState = parsed.tunnelState
+            ddiAvailable = parsed.ddiServicesAvailable
+        }
+
+        let connected = tunnelState.lowercased() == "connected"
+        let ready = result.exitCode == 0 && !locked && !incomplete && connected && !combined.contains("ERROR:")
+        return DeviceProbeResult(
+            ready: ready,
+            locked: locked,
+            tunnelState: tunnelState,
+            ddiServicesAvailable: ddiAvailable,
+            output: combined
+        )
+    }
+
+    public static func parseDeviceDetailsJSON(_ data: Data) -> (tunnelState: String, ddiServicesAvailable: Bool)? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let result = root["result"] as? [String: Any] else {
+            return nil
+        }
+        let cp = result["connectionProperties"] as? [String: Any] ?? [:]
+        let dp = result["deviceProperties"] as? [String: Any] ?? [:]
+        let tunnelState = cp["tunnelState"] as? String ?? "unknown"
+        let ddi = dp["ddiServicesAvailable"] as? Bool ?? false
+        return (tunnelState, ddi)
     }
 
     public static func parseListDevicesJSON(_ data: Data) throws -> [DeviceCtlDevice] {

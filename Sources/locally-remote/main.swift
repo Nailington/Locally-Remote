@@ -393,6 +393,7 @@ private struct WakePayload: Codable {
     let udid: String
     let ready: Bool
     let locked: Bool
+    let tunnelState: String
     let tailscaleIP: String?
     let tcpReachable: Bool
     let output: String
@@ -425,23 +426,29 @@ private func runWake(_ args: ParsedArgs, store: ConfigStore) -> Int32 {
         let probe = try DeviceCtlClient().probeDevice(identifier: targetUDID, timeoutSeconds: timeout)
         let payload = WakePayload(
             udid: targetUDID,
-            ready: probe.ok,
+            ready: probe.ready,
             locked: probe.locked,
+            tunnelState: probe.tunnelState,
             tailscaleIP: tsIP,
             tcpReachable: tcpReachable,
             output: probe.output
         )
         if args.wantsJSON {
             printJSON(payload)
-        } else if probe.ok {
-            print("Device \(targetUDID) is READY for Xcode / SweetPad builds.")
+        } else if probe.ready {
+            print("Device \(targetUDID) is READY for Xcode / SweetPad builds (tunnelState=\(probe.tunnelState)).")
         } else if probe.locked {
             print("Device \(targetUDID) is reachable over the tunnel, but LOCKED. Unlock your iPhone and retry.")
         } else {
-            print("Device \(targetUDID) is NOT ready (tailscale=\(tsIP ?? "unknown"), tcp49152=\(tcpReachable)).")
-            print(probe.output)
+            print("Device \(targetUDID) is NOT ready (tunnelState=\(probe.tunnelState), tailscale=\(tsIP ?? "unknown"), tcp49152=\(tcpReachable)).")
+            if !tcpReachable {
+                print("Hint: TCP:49152 did not accept connections. Ensure the iPhone is connected to a Wi-Fi network (iOS stops remotepairingd on cellular-only) with Tailscale active.")
+            }
+            if !probe.output.isEmpty {
+                print(probe.output)
+            }
         }
-        return probe.ok ? 0 : 1
+        return probe.ready ? 0 : 1
     } catch {
         fputs("Wake failed: \(error.localizedDescription)\n", stderr)
         return 1

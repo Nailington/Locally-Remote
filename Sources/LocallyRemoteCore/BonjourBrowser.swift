@@ -9,7 +9,22 @@ public struct DiscoveredBonjourService: Sendable, Equatable {
     public let interfaceName: String
     public let hostTarget: String
     public let port: UInt16
+    public let resolvedAddresses: [String]
     public let record: BonjourRecord
+
+    /// Actively checks whether the advertised LAN endpoint is accepting TCP connections.
+    /// Filters out stale mDNSResponder cache entries after a device leaves Wi-Fi without a goodbye packet.
+    public func isLiveOnLAN(timeoutSeconds: Double = 0.6) -> Bool {
+        let lanAddrs = Array(resolvedAddresses.filter { !NetworkHelpers.isTailscaleOrLoopbackAddress($0) }.prefix(2))
+        guard !lanAddrs.isEmpty else { return false }
+        for addr in lanAddrs {
+            let scope: UInt32 = addr.lowercased().hasPrefix("fe80:") ? interfaceIndex : 0
+            if NetworkHelpers.probeTCP(host: addr, port: port, scopeIndex: scope, timeoutSeconds: timeoutSeconds) {
+                return true
+            }
+        }
+        return false
+    }
 }
 
 /// Native `dnssd` browser for `_remotepairing._tcp` services on physical (non-loopback) interfaces.
@@ -281,6 +296,7 @@ public final class PhysicalBonjourBrowser: @unchecked Sendable {
                     interfaceName: b.interfaceName,
                     hostTarget: host,
                     port: hostPort,
+                    resolvedAddresses: [],
                     record: record
                 )
             },
@@ -303,6 +319,99 @@ public final class PhysicalBonjourBrowser: @unchecked Sendable {
                 }
             }
         }
-        return box.result
+        guard let resolved = box.result else { return nil }
+        let addrs = resolveHostAddresses(host: resolved.hostTarget, interfaceIndex: interfaceIndex, timeout: 1.0)
+        return DiscoveredBonjourService(
+            instanceName: resolved.instanceName,
+            interfaceIndex: resolved.interfaceIndex,
+            interfaceName: resolved.interfaceName,
+            hostTarget: resolved.hostTarget,
+            port: resolved.port,
+            resolvedAddresses: addrs,
+            record: resolved.record
+        )
+    }
+
+    private final class AddrBox: @unchecked Sendable {
+        var addresses: [String] = []
+        var moreComing = true
+    }
+
+    /// Resolves IPv4 and IPv6 addresses for an mDNS host target scoped to a specific interface.
+    private static func resolveHostAddresses(
+        host: String,
+        interfaceIndex: UInt32,
+        timeout: TimeInterval = 1.0
+    ) -> [String] {
+        let box = AddrBox()
+        let ctx = Unmanaged.passRetained(box).toOpaque()
+        defer { Unmanaged<AddrBox>.fromOpaque(ctx).release() }
+
+        var ref: DNSServiceRef?
+        let err = DNSServiceGetAddrInfo(
+            &ref,
+            0,
+            interfaceIndex,
+            DNSServiceProtocol(kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6),
+            host,
+            { _, flags, _, errorCode, _, address, _, context in
+                guard let context else { return }
+                let b = Unmanaged<AddrBox>.fromOpaque(context).takeUnretainedValue()
+                b.moreComing = (flags & DNSServiceFlags(kDNSServiceFlagsMoreComing)) != 0
+                guard errorCode == kDNSServiceErr_NoError,
+                      (flags & DNSServiceFlags(kDNSServiceFlagsAdd)) != 0,
+                      let address else { return }
+
+                let family = Int32(address.pointee.sa_family)
+                if family == AF_INET {
+                    var sin = address.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee }
+                    var buf = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
+                    let ip: String? = buf.withUnsafeMutableBufferPointer { ptr in
+                        guard let base = ptr.baseAddress,
+                              inet_ntop(AF_INET, &sin.sin_addr, base, socklen_t(ptr.count)) != nil else { return nil }
+                        return String(cString: base)
+                    }
+                    if let ip, !b.addresses.contains(ip) {
+                        b.addresses.append(ip)
+                    }
+                } else if family == AF_INET6 {
+                    var sin6 = address.withMemoryRebound(to: sockaddr_in6.self, capacity: 1) { $0.pointee }
+                    var buf = [CChar](repeating: 0, count: Int(INET6_ADDRSTRLEN))
+                    let ip: String? = buf.withUnsafeMutableBufferPointer { ptr in
+                        guard let base = ptr.baseAddress,
+                              inet_ntop(AF_INET6, &sin6.sin6_addr, base, socklen_t(ptr.count)) != nil else { return nil }
+                        return String(cString: base)
+                    }
+                    if let ip, !b.addresses.contains(ip) {
+                        b.addresses.append(ip)
+                    }
+                }
+            },
+            ctx
+        )
+
+        guard err == kDNSServiceErr_NoError, let addrRef = ref else { return [] }
+        defer { DNSServiceRefDeallocate(addrRef) }
+
+        let fd = DNSServiceRefSockFD(addrRef)
+        guard fd >= 0 else { return [] }
+
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            var pfd = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+            let rc = poll(&pfd, 1, 150)
+            if rc > 0 && (pfd.revents & Int16(POLLIN)) != 0 {
+                if DNSServiceProcessResult(addrRef) != kDNSServiceErr_NoError {
+                    break
+                }
+                if !box.moreComing && !box.addresses.isEmpty {
+                    break
+                }
+            }
+        }
+        // Prefer IPv4 first for fast LAN reachability checks, then IPv6.
+        let v4 = box.addresses.filter { !$0.contains(":") }
+        let v6 = box.addresses.filter { $0.contains(":") }
+        return v4 + v6
     }
 }

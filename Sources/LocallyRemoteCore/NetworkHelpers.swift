@@ -69,7 +69,12 @@ public enum NetworkHelpers {
     }
 
     /// Non-blocking TCP connect probe to test whether `<ip>:<port>` is accepting connections.
-    public static func probeTCP(host: String, port: UInt16, timeoutSeconds: Double = 2.0) -> Bool {
+    public static func probeTCP(
+        host: String,
+        port: UInt16,
+        scopeIndex: UInt32 = 0,
+        timeoutSeconds: Double = 2.0
+    ) -> Bool {
         let isIPv6 = host.contains(":")
         let fd = socket(isIPv6 ? AF_INET6 : AF_INET, SOCK_STREAM, 0)
         guard fd >= 0 else { return false }
@@ -84,6 +89,7 @@ public enum NetworkHelpers {
             addr.sin6_len = UInt8(MemoryLayout<sockaddr_in6>.size)
             addr.sin6_family = sa_family_t(AF_INET6)
             addr.sin6_port = port.bigEndian
+            addr.sin6_scope_id = scopeIndex
             guard inet_pton(AF_INET6, host, &addr.sin6_addr) == 1 else { return false }
             connectResult = withUnsafePointer(to: &addr) {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
@@ -121,6 +127,24 @@ public enum NetworkHelpers {
             return false
         }
         return sockErr == 0
+    }
+
+    /// Returns true if an IP address belongs to loopback or Tailscale (100.64.0.0/10 or fd7a:115c:a1e0::/48).
+    public static func isTailscaleOrLoopbackAddress(_ ip: String) -> Bool {
+        let lower = ip.lowercased()
+        if lower == "::1" || lower == "fe80::1" || lower.hasPrefix("127.") {
+            return true
+        }
+        if lower.hasPrefix("fd7a:115c:a1e0:") {
+            return true
+        }
+        let parts = lower.split(separator: ".")
+        if parts.count == 4, let a = Int(parts[0]), let b = Int(parts[1]) {
+            if a == 100 && (64...127).contains(b) {
+                return true
+            }
+        }
+        return false
     }
 
     /// Resolves the best active RemotePairing port on the remote iPhone (prefers `preferredPort`, usually `49152`).

@@ -107,6 +107,17 @@ public final class BridgeController: @unchecked Sendable {
 
         log("Starting locally-remote daemon (pid=\(ProcessInfo.processInfo.processIdentifier), forceBridge=\(forceBridge))")
 
+        // Write initial state immediately so `locally-remote status` sees the live daemon during first probe.
+        let initialConfig = (try? store.loadConfig()) ?? AppConfig()
+        try? store.saveRuntimeState(DaemonRuntimeState(
+            pid: ProcessInfo.processInfo.processIdentifier,
+            startedAt: startedAt,
+            updatedAt: Date(),
+            bindMode: bindModeOverride ?? initialConfig.bindMode,
+            forceBridge: forceBridge,
+            devices: []
+        ))
+
         browser.start { [weak self] services in
             self?.handleLANServicesUpdated(services)
         }
@@ -167,6 +178,9 @@ public final class BridgeController: @unchecked Sendable {
 
         for svc in services {
             if let idx = matchSavedDeviceIndex(for: svc, in: config.devices) {
+                guard svc.isLiveOnLAN(timeoutSeconds: 1.0) else {
+                    continue
+                }
                 let udid = config.devices[idx].udid
                 lock.lock()
                 lanLastSeenByUDID[udid] = now
@@ -250,18 +264,27 @@ public final class BridgeController: @unchecked Sendable {
                 continue
             }
 
-            // Refresh LAN last-seen if service is currently in active physical browser list
-            let lanServices = browser.currentServices()
-            if lanServices.contains(where: { matchSavedDeviceIndex(for: $0, in: [device]) != nil }) {
+            // Actively verify LAN liveness so stale mDNSResponder cache entries after Wi-Fi off
+            // do not hold the daemon in local_lan standby.
+            let matchingLAN = browser.currentServices().filter {
+                matchSavedDeviceIndex(for: $0, in: [device]) != nil
+            }
+            let liveOnLAN = matchingLAN.contains(where: { $0.isLiveOnLAN(timeoutSeconds: 0.6) })
+            if liveOnLAN {
                 lock.lock()
                 lanLastSeenByUDID[device.udid] = now
+                lock.unlock()
+            } else if !matchingLAN.isEmpty {
+                // Service is still in mDNS cache, but direct LAN TCP failed: clear stale LAN state now.
+                lock.lock()
+                lanLastSeenByUDID.removeValue(forKey: device.udid)
                 lock.unlock()
             }
 
             lock.lock()
             let lastSeenLAN = lanLastSeenByUDID[device.udid]
             lock.unlock()
-            let lanPresent = lastSeenLAN.map { now.timeIntervalSince($0) < lanGraceSeconds } ?? false
+            let lanPresent = liveOnLAN || (lastSeenLAN.map { now.timeIntervalSince($0) < lanGraceSeconds } ?? false)
 
             // Resolve current Tailscale IP from live tailscale status when available
             let matchedPeer = tsSnapshot.flatMap {

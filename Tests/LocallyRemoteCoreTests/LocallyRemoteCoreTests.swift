@@ -112,6 +112,55 @@ struct LocallyRemoteCoreTests {
         #expect(devices[0].potentialHostnames == ["Test-iPhone.coredevice.local"])
     }
 
+    @Test("devicectl device info details JSON parsing checks tunnelState")
+    func deviceDetailsParsing() throws {
+        let unavailableJSON = """
+        {
+          "result": {
+            "connectionProperties": {
+              "tunnelState": "unavailable"
+            },
+            "deviceProperties": {
+              "ddiServicesAvailable": false
+            }
+          }
+        }
+        """
+        let unavailable = try #require(DeviceCtlClient.parseDeviceDetailsJSON(Data(unavailableJSON.utf8)))
+        #expect(unavailable.tunnelState == "unavailable")
+        #expect(unavailable.ddiServicesAvailable == false)
+
+        let connectedJSON = """
+        {
+          "result": {
+            "connectionProperties": {
+              "tunnelState": "connected"
+            },
+            "deviceProperties": {
+              "ddiServicesAvailable": true
+            }
+          }
+        }
+        """
+        let connected = try #require(DeviceCtlClient.parseDeviceDetailsJSON(Data(connectedJSON.utf8)))
+        #expect(connected.tunnelState == "connected")
+        #expect(connected.ddiServicesAvailable == true)
+    }
+
+    @Test("LAN address filter excludes loopback and Tailscale ranges")
+    func lanAddressFilter() {
+        #expect(NetworkHelpers.isTailscaleOrLoopbackAddress("127.0.0.1") == true)
+        #expect(NetworkHelpers.isTailscaleOrLoopbackAddress("::1") == true)
+        #expect(NetworkHelpers.isTailscaleOrLoopbackAddress("fe80::1") == true)
+        #expect(NetworkHelpers.isTailscaleOrLoopbackAddress("100.64.0.20") == true)
+        #expect(NetworkHelpers.isTailscaleOrLoopbackAddress("100.127.255.1") == true)
+        #expect(NetworkHelpers.isTailscaleOrLoopbackAddress("fd7a:115c:a1e0::1") == true)
+
+        #expect(NetworkHelpers.isTailscaleOrLoopbackAddress("192.168.1.50") == false)
+        #expect(NetworkHelpers.isTailscaleOrLoopbackAddress("10.0.0.12") == false)
+        #expect(NetworkHelpers.isTailscaleOrLoopbackAddress("fe80::c51:c6e6:1ca6:5e1c") == false)
+    }
+
     @Test("ConfigStore saves, upserts, and removes devices atomically")
     func configStoreRoundTrip() throws {
         let tempDir = FileManager.default.temporaryDirectory

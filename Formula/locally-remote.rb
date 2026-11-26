@@ -1,9 +1,9 @@
 class LocallyRemote < Formula
   desc "Headless Tailscale bridge for Xcode, CoreDevice, and SweetPad wireless builds"
   homepage "https://github.com/Nailington/Locally-Remote"
-  url "https://github.com/Nailington/Locally-Remote/releases/download/v0.2.0/locally-remote-0.2.0-macos-universal.tar.gz"
-  version "0.2.0"
-  sha256 "a3a0249d692103f66be78769ed6c88d9cac4558e03a219cefdac1686c1391bd8"
+  url "https://github.com/Nailington/Locally-Remote/releases/download/v0.2.1/locally-remote-0.2.1-macos-universal.tar.gz"
+  version "0.2.1"
+  sha256 "dd53a4d1adb85ca357d77a801ad93682fcd95d9f630fadd9bcdb9f48e64cdb7d"
   license "MIT"
 
   depends_on :macos

@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "Formula/**"
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    name: Build & Test (macOS)
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          swift --version
+
+      - name: Run unit and relay tests
+        run: swift test
+
+      - name: Build universal release binary
+        run: |
+          swift build -c release --arch arm64 --arch x86_64
+          BIN=".build/apple/Products/Release/locally-remote"
+          lipo -info "$BIN"
+          lipo -verify_arch arm64 x86_64 "$BIN"
+          "$BIN" --version
+          "$BIN" help >/dev/null

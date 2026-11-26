@@ -61,6 +61,8 @@ private func printUsage() {
 
       remove <ref>       Remove a saved device by UDID, name, or Tailscale hostname
 
+      version            Print the locally-remote version (--version, -v)
+
       help               Show this help message
     """
     print(usage)
@@ -621,6 +623,9 @@ case "uninstall-agent":
     exitCode = runUninstallAgent()
 case "remove":
     exitCode = runRemove(args, store: store)
+case "version", "--version", "-v":
+    print(LocallyRemoteVersion.current)
+    exitCode = 0
 case "help", "-h", "--help":
     printUsage()
     exitCode = 0

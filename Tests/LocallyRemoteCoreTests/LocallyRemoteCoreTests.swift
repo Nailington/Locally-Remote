@@ -6,6 +6,13 @@ import Testing
 @Suite("LocallyRemoteCore Tests")
 struct LocallyRemoteCoreTests {
 
+    @Test("Version string follows semantic versioning")
+    func versionStringFormat() {
+        let parts = LocallyRemoteVersion.current.split(separator: ".")
+        #expect(parts.count == 3)
+        #expect(parts.allSatisfy { Int($0) != nil })
+    }
+
     @Test("TXT record encodes and decodes RFC 6763 wire format")
     func txtRecordRoundTrip() {
         let record = BonjourRecord(

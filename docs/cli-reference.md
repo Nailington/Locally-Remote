@@ -83,6 +83,10 @@ Runs `launchctl bootout` and deletes the LaunchAgent plist.
 
 Removes a saved device matching UDID, name, CoreDevice identifier, or Tailscale DNS substring from `config.json`.
 
+### `locally-remote version`
+
+Prints the semantic version string (also accepted as `--version` and `-v`).
+
 ## Exit Codes
 
 - `0`: command succeeded (or device ready / all doctor checks passed).

@@ -37,12 +37,38 @@ iOS shuts down `remotepairingd` (port `49152`) and `lockdownd` (port `62078`) wh
 
 ## Install
 
-Build and install the release binary on the Mac:
+### Homebrew
+
+```bash
+brew tap nailington/locally-remote https://github.com/Nailington/Locally-Remote.git
+brew install nailington/locally-remote/locally-remote
+```
+
+You can start the daemon with either `locally-remote install-agent` or `brew services start locally-remote`.
+
+### macOS Installer Package (.pkg)
+
+Download `locally-remote-<version>-macos-universal.pkg` from the [GitHub Releases](https://github.com/Nailington/Locally-Remote/releases) page. Double-click it to install `/usr/local/bin/locally-remote`, or run it headlessly:
+
+```bash
+sudo installer -pkg locally-remote-<version>-macos-universal.pkg -target /
+```
+
+### Shell Script
+
+Downloads the latest universal tarball, verifies its SHA256 checksum, and installs to `~/.local/bin/locally-remote`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Nailington/Locally-Remote/main/scripts/install.sh | sh
+```
+
+### Build From Source
 
 ```bash
 swift build -c release
 mkdir -p ~/.local/bin
-cp .build/release/locally-remote ~/.local/bin/locally-remote
+cp .build/release/locally-remote ~/.local/bin/locally-remote.new
+mv -f ~/.local/bin/locally-remote.new ~/.local/bin/locally-remote
 ```
 
 ## Quick Start
@@ -51,14 +77,14 @@ Run these commands on the Mac while the iPhone is unlocked on the same local Wi-
 
 ```bash
 # Capture the phone's Bonjour record and link it to its Tailscale peer
-~/.local/bin/locally-remote capture
+locally-remote capture
 
 # Install and start the background LaunchAgent
-~/.local/bin/locally-remote install-agent
+locally-remote install-agent
 
 # Verify setup
-~/.local/bin/locally-remote doctor
-~/.local/bin/locally-remote status
+locally-remote doctor
+locally-remote status
 ```
 
 ## Using With Xcode, devicectl, and SweetPad

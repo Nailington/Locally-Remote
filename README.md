@@ -40,8 +40,7 @@ iOS shuts down `remotepairingd` (port `49152`) and `lockdownd` (port `62078`) wh
 ### Homebrew
 
 ```bash
-brew tap nailington/locally-remote https://github.com/Nailington/Locally-Remote.git
-brew install nailington/locally-remote/locally-remote
+brew install nailington/tap/locally-remote
 ```
 
 You can start the daemon with either `locally-remote install-agent` or `brew services start locally-remote`.

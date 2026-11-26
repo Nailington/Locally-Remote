@@ -146,8 +146,7 @@ jobs:
           ### Homebrew
 
           \`\`\`bash
-          brew tap nailington/locally-remote https://github.com/${REPO}.git
-          brew install nailington/locally-remote/locally-remote
+          brew install nailington/tap/locally-remote
           \`\`\`
 
           ### macOS Installer (.pkg)

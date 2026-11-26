@@ -9,7 +9,7 @@ description: Manage and verify remote iOS device bridging over Tailscale using t
 
 ## Prerequisites
 
-- The binary is installed on the Mac (via Homebrew, `.pkg` at `/usr/local/bin/locally-remote`, or `~/.local/bin/locally-remote`). Check with `locally-remote --version`.
+- Check for the CLI on the Mac with `locally-remote --version`. To install it with Homebrew, run `brew install nailington/tap/locally-remote`.
 - The iOS device was paired with the Mac at least once over USB or local Wi-Fi and has Developer Mode enabled.
 - Both the Mac and the iOS device are signed into the same Tailscale tailnet.
 - To start a new remote session, the iOS device must be on any Wi-Fi network with Tailscale enabled. iOS stops listening on TCP port `49152` when Wi-Fi is completely off.

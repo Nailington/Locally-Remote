@@ -83,6 +83,15 @@ Runs `launchctl bootout` and deletes the LaunchAgent plist.
 
 Removes a saved device matching UDID, name, CoreDevice identifier, or Tailscale DNS substring from `config.json`.
 
+### `locally-remote completions`
+
+Prints or installs shell tab completions for `zsh`, `bash`, and `fish`.
+
+Subcommands:
+
+- `locally-remote completions <zsh|bash|fish>`: write the completion script to stdout.
+- `locally-remote completions install [--shell <zsh|bash|fish>] [--json]`: install the completion file into the active Homebrew or user completion directory for the current or specified shell.
+
 ### `locally-remote version`
 
 Prints the semantic version string (also accepted as `--version` and `-v`).

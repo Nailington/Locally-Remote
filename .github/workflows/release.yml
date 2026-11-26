@@ -66,22 +66,31 @@ jobs:
           BIN=".build/apple/Products/Release/locally-remote"
           mkdir -p dist
 
-          # 1. Universal tarball (used by Homebrew, curl installer, and manual installs)
+          # 1. Generate shell completions from the built binary
+          COMP_STAGE="dist/completions"
+          mkdir -p "${COMP_STAGE}"
+          "${BIN}" completions zsh > "${COMP_STAGE}/_locally-remote"
+          "${BIN}" completions bash > "${COMP_STAGE}/locally-remote.bash"
+          "${BIN}" completions fish > "${COMP_STAGE}/locally-remote.fish"
+
+          # 2. Universal tarball (used by Homebrew, curl installer, and manual installs)
           TAR_STAGE="dist/locally-remote-${VERSION}-macos-universal"
           mkdir -p "${TAR_STAGE}"
           cp "${BIN}" "${TAR_STAGE}/locally-remote"
           chmod 0755 "${TAR_STAGE}/locally-remote"
           cp README.md LICENSE "${TAR_STAGE}/"
-          cp -R docs skills "${TAR_STAGE}/"
+          cp -R docs skills "${COMP_STAGE}" "${TAR_STAGE}/"
 
           TAR_NAME="locally-remote-${VERSION}-macos-universal.tar.gz"
           tar -C dist -czf "dist/${TAR_NAME}" "locally-remote-${VERSION}-macos-universal"
 
-          # 2. Native macOS .pkg installer (installs /usr/local/bin/locally-remote)
+          # 3. Native macOS .pkg installer (installs binary + zsh completion)
           PKG_ROOT="dist/pkgroot"
-          mkdir -p "${PKG_ROOT}/usr/local/bin"
+          mkdir -p "${PKG_ROOT}/usr/local/bin" "${PKG_ROOT}/usr/local/share/zsh/site-functions"
           cp "${BIN}" "${PKG_ROOT}/usr/local/bin/locally-remote"
           chmod 0755 "${PKG_ROOT}/usr/local/bin/locally-remote"
+          cp "${COMP_STAGE}/_locally-remote" "${PKG_ROOT}/usr/local/share/zsh/site-functions/_locally-remote"
+          chmod 0644 "${PKG_ROOT}/usr/local/share/zsh/site-functions/_locally-remote"
 
           COMP_PKG="dist/locally-remote-component.pkg"
           PKG_NAME="locally-remote-${VERSION}-macos-universal.pkg"
@@ -213,6 +222,9 @@ jobs:
 
             def install
               bin.install "locally-remote"
+              zsh_completion.install "completions/_locally-remote"
+              bash_completion.install "completions/locally-remote.bash" => "locally-remote"
+              fish_completion.install "completions/locally-remote.fish"
               doc.install "README.md", "docs", "skills"
             end
 

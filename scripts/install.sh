@@ -45,3 +45,4 @@ chmod 0755 "${INSTALL_DIR}/locally-remote.new"
 mv -f "${INSTALL_DIR}/locally-remote.new" "${INSTALL_DIR}/locally-remote"
 
 echo "Installed locally-remote ${VERSION} to ${INSTALL_DIR}/locally-remote"
+"${INSTALL_DIR}/locally-remote" completions install || true

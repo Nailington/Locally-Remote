@@ -158,6 +158,49 @@ struct LocallyRemoteCoreTests {
         #expect(!xml.contains("--force-bridge"))
     }
 
+    @Test("Shell completions generate valid zsh, bash, and fish scripts")
+    func shellCompletionsGenerate() {
+        let zsh = ShellCompletions.generate(for: .zsh)
+        #expect(zsh.hasPrefix("#compdef locally-remote"))
+        #expect(zsh.contains("install-agent"))
+        #expect(zsh.contains("completions"))
+        #expect(zsh.contains("lo0 lan loopback4"))
+
+        let bash = ShellCompletions.generate(for: .bash)
+        #expect(bash.contains("complete -F _locally_remote locally-remote"))
+        #expect(bash.contains("--force-bridge"))
+
+        let fish = ShellCompletions.generate(for: .fish)
+        #expect(fish.contains("complete -c locally-remote"))
+        #expect(fish.contains("uninstall-agent"))
+    }
+
+    @Test("Shell completions install writes script to target directory")
+    func shellCompletionsInstall() throws {
+        let tempHome = FileManager.default.temporaryDirectory
+            .appendingPathComponent("locally-remote-comp-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempHome) }
+
+        let zshResult = try ShellCompletions.install(
+            shell: .zsh,
+            homeDirectory: tempHome,
+            systemSearchPaths: []
+        )
+        #expect(zshResult.shell == .zsh)
+        #expect(zshResult.usesDefaultFpath == false)
+        #expect(FileManager.default.fileExists(atPath: zshResult.path))
+        let zshText = try String(contentsOfFile: zshResult.path, encoding: .utf8)
+        #expect(zshText.contains("#compdef locally-remote"))
+
+        let fishResult = try ShellCompletions.install(
+            shell: .fish,
+            homeDirectory: tempHome,
+            systemSearchPaths: []
+        )
+        #expect(fishResult.shell == .fish)
+        #expect(FileManager.default.fileExists(atPath: fishResult.path))
+    }
+
     @Test("PortRelayServer forwards bidirectional TCP bytes on fe80::1%lo0 to upstream")
     func liveTCPRelayLoopbackTest() throws {
         let echoPort: UInt16 = 59876

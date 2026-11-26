@@ -70,6 +70,22 @@ cp .build/release/locally-remote ~/.local/bin/locally-remote.new
 mv -f ~/.local/bin/locally-remote.new ~/.local/bin/locally-remote
 ```
 
+### Shell Completions
+
+Homebrew installs zsh, bash, and fish completions into Homebrew's completion directories, and the `.pkg` installer installs zsh completions to `/usr/local/share/zsh/site-functions/_locally-remote`.
+
+To install completions directly for your current shell (or wire `~/.zshrc` when needed):
+
+```bash
+# Built-in one-time command
+locally-remote completions install
+
+# Or run the standalone completion installer script
+curl -fsSL https://raw.githubusercontent.com/Nailington/Locally-Remote/main/scripts/install-completions.sh | sh
+```
+
+To print a completion script to stdout for manual placement, run `locally-remote completions zsh`, `locally-remote completions bash`, or `locally-remote completions fish`.
+
 ## Quick Start
 
 Run these commands on the Mac while the iPhone is unlocked on the same local Wi-Fi network:

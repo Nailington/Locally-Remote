@@ -61,6 +61,11 @@ private func printUsage() {
 
       remove <ref>       Remove a saved device by UDID, name, or Tailscale hostname
 
+      completions        Print or install shell tab completions (zsh, bash, fish)
+        <zsh|bash|fish>        Print completion script to stdout
+        install [--shell <s>]  Install completion script for current or chosen shell
+        --json                 Output JSON (with install)
+
       version            Print the locally-remote version (--version, -v)
 
       help               Show this help message
@@ -97,7 +102,7 @@ func parseArgs(_ argv: [String]) -> ParsedArgs {
 
     let valueOptions: Set<String> = [
         "--device", "--tailscale-peer", "--timeout", "--bind",
-        "--port-range", "--poll-interval", "--bin"
+        "--port-range", "--poll-interval", "--bin", "--shell"
     ]
 
     var i = 2
@@ -598,6 +603,47 @@ private func runRemove(_ args: ParsedArgs, store: ConfigStore) -> Int32 {
     }
 }
 
+private func runCompletions(_ args: ParsedArgs) -> Int32 {
+    guard let target = args.positionals.first?.lowercased() else {
+        fputs("Usage: locally-remote completions <zsh|bash|fish|install> [--shell <zsh|bash|fish>] [--json]\n", stderr)
+        return 2
+    }
+
+    if target == "install" {
+        let chosenShell: ShellType?
+        if let raw = args.options["--shell"]?.lowercased() {
+            guard let parsed = ShellType(rawValue: raw) else {
+                fputs("Unsupported shell '\(raw)'. Expected one of: zsh, bash, fish.\n", stderr)
+                return 2
+            }
+            chosenShell = parsed
+        } else {
+            chosenShell = nil
+        }
+
+        do {
+            let result = try ShellCompletions.install(shell: chosenShell)
+            if args.wantsJSON {
+                printJSON(result)
+            } else {
+                print("Installed \(result.shell.rawValue) completions to \(result.path)")
+                print(result.nextSteps)
+            }
+            return 0
+        } catch {
+            fputs("Failed to install completions: \(error.localizedDescription)\n", stderr)
+            return 1
+        }
+    }
+
+    guard let shell = ShellType(rawValue: target) else {
+        fputs("Unsupported completions target '\(target)'. Expected one of: zsh, bash, fish, install.\n", stderr)
+        return 2
+    }
+    print(ShellCompletions.generate(for: shell))
+    return 0
+}
+
 // MARK: - Main Entry Point
 
 let args = parseArgs(CommandLine.arguments)
@@ -623,6 +669,8 @@ case "uninstall-agent":
     exitCode = runUninstallAgent()
 case "remove":
     exitCode = runRemove(args, store: store)
+case "completions":
+    exitCode = runCompletions(args)
 case "version", "--version", "-v":
     print(LocallyRemoteVersion.current)
     exitCode = 0

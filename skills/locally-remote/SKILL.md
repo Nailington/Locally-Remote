@@ -80,6 +80,7 @@ sweetpad run --remote "<Remote Mac>" --scheme <Scheme> --on <DEVICE_UDID> --deta
   locally-remote install-agent --bind lan
   ```
 - To test the Tailscale relay path while the phone is still on the Mac's local Wi-Fi, run the daemon in the foreground with `--force-bridge --verbose`.
+- To enable or reinstall shell tab completion (`zsh`, `bash`, or `fish`), run `locally-remote completions install` (or `locally-remote completions <shell>` to print the script).
 
 ## Deeper Documentation
 

@@ -33,3 +33,6 @@ jobs:
           lipo "$BIN" -verify_arch arm64 x86_64
           "$BIN" --version
           "$BIN" help >/dev/null
+          "$BIN" completions zsh >/dev/null
+          "$BIN" completions bash >/dev/null
+          "$BIN" completions fish >/dev/null

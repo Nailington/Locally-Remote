@@ -30,6 +30,6 @@ jobs:
           swift build -c release --arch arm64 --arch x86_64
           BIN=".build/apple/Products/Release/locally-remote"
           lipo -info "$BIN"
-          lipo -verify_arch arm64 x86_64 "$BIN"
+          lipo "$BIN" -verify_arch arm64 x86_64
           "$BIN" --version
           "$BIN" help >/dev/null

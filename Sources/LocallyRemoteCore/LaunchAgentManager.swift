@@ -79,11 +79,23 @@ public enum LaunchAgentManager {
 
         let uid = getuid()
         // Unload any prior instance before bootstrapping the updated plist.
-        _ = try? NetworkHelpers.runProcess(
+        let bootout = try? NetworkHelpers.runProcess(
             executable: "/bin/launchctl",
             arguments: ["bootout", "gui/\(uid)/\(label)"],
             timeout: 10
         )
+        if bootout?.exitCode == 0 {
+            // launchctl bootout tears down asynchronously; wait briefly for the service slot to clear.
+            for _ in 0..<20 {
+                let probe = try? NetworkHelpers.runProcess(
+                    executable: "/bin/launchctl",
+                    arguments: ["print", "gui/\(uid)/\(label)"],
+                    timeout: 5
+                )
+                if probe?.exitCode != 0 { break }
+                Thread.sleep(forTimeInterval: 0.1)
+            }
+        }
         let boot = try NetworkHelpers.runProcess(
             executable: "/bin/launchctl",
             arguments: ["bootstrap", "gui/\(uid)", plistURL.path],
